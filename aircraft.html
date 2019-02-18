@@ -1,0 +1,604 @@
+
+
+<!doctype html>
+<html lang="en">
+<!-- 物体发光效果 -->
+<head>
+    <title>Simple Glow (Three.js)</title>
+    <meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<style>
+		*{
+			margin: 0;
+			padding: 0;
+		}
+		canvas {
+			background: linear-gradient(#e4e0ba, #f7d9aa);
+		}
+	</style>
+</head>
+
+<body>
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/three.min.js"></script>
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/controls/OrbitControls.js"></script>
+    <script>
+        var scene = new THREE.Scene();
+        var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+		// let width = window.innerWidth;
+		// let height = window.innerHeight;
+		// var camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2, 0.1, 1000);
+        camera.position.set(0, 15, 90);
+        var renderer = new THREE.WebGLRenderer({
+				antialias: true,
+				alpha: true
+		});
+		// renderer.setPixelRatio(window.devicePixelRatio);
+		// renderer.gammaOutput = true;
+		// renderer.shadowMap.enabled = true;
+		renderer.shadowMapEnabled = true;
+		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+		var clock = new THREE.Clock();
+		createLights();
+		var gridHelper = new THREE.GridHelper( 400, 40, 0x808080, 0x808080 );
+		gridHelper.position.y = 0;
+		gridHelper.position.x = 0;
+		// scene.add( gridHelper );
+		
+		let forest = create_forest(THREE);
+		let sun = create_sun(THREE);
+		let plane = create_plane(THREE);
+
+
+
+		var geometry = new THREE.BoxBufferGeometry( 3, 3, 3 );
+		var material = new THREE.MeshPhongMaterial( {
+			color: 0xff0000,
+			shininess: 150,
+			specular: 0x222222
+		} );
+		world = new THREE.Mesh( geometry, material );
+		// world.position = forest.position.clone();
+		world.position.set(0, -46, 22);
+		world.castShadow = true;
+		world.receiveShadow = true;
+
+		world.add(forest);
+		// let g = new THREE.Object3D();
+		// g.add(world);
+		// g.rotateOnAxis(new THREE.Vector3(0,1,0), Math.PI / 2);
+		scene.add( world );
+		scene.add( sun );
+		
+		let plane_scale = 0.3;
+		plane.scale.set(plane_scale,plane_scale,plane_scale);
+		plane.position.set(-2,4,40);
+		scene.add( plane );
+		let propellers = scene.getObjectByName('propellers');
+		
+		let mouse = new THREE.Vector2();
+		
+		// setInterval(()=> {
+		// 	console.log(camera.position);
+		// }, 1000)
+		scene_effect(THREE);
+		var edge = {
+			top: 4,
+			bottom: -4,
+			left: -4,
+			right: 4
+		}
+        render();
+		window.addEventListener( 'resize', onWindowResize, false );
+		function rotate(v,deg,obj) {
+			var axis = v;    //创建一个三维向量
+			var rotWorldMatrix = new THREE.Matrix4();      //创建一个4*4矩阵
+			rotWorldMatrix.makeRotationAxis(axis.normalize(),  deg );
+			rotWorldMatrix.multiply(obj.matrix);                // pre-multiply
+			obj.matrix = rotWorldMatrix;
+			obj.rotation.setFromRotationMatrix(obj.matrix);
+		}
+		function onWindowResize() {
+
+		camera.aspect = window.innerWidth / window.innerHeight;
+		camera.updateProjectionMatrix();
+
+		renderer.setSize( window.innerWidth, window.innerHeight );
+
+		}
+        function render() {
+            requestAnimationFrame(render);
+			var delta = clock.getDelta();
+			world.rotation.z += 0.25 * delta;
+			propellers.rotation.x += 14 * delta;
+			updatePlane();
+            renderer.render(scene, camera);
+        }
+
+		function create_tree (THREE) {
+			let tree = new THREE.Group();
+			let params = {
+				space: 7.4,
+				part_num: 3,
+				proportion: 1.2
+			}
+			let tree_part = {
+				size: 10,
+				height: 12
+			}
+			// https://threejs.org/docs/index.html#api/zh/geometries/ConeBufferGeometry
+			var geometry = new THREE.ConeBufferGeometry( tree_part.size, tree_part.height, 4);
+			var material = new THREE.MeshLambertMaterial( {color: 0x599c59} );
+			var part = new THREE.Mesh( geometry, material );
+			part.castShadow = true;
+			part.receiveShadow = true;
+			var parts = new THREE.Group();
+
+			// 按数量创建树节
+			for(let i = 0 ;i< params.part_num;i++) {
+				let clone_part = part.clone();
+				clone_part.position.y = i * params.space; // 高度差
+				parts.add(clone_part);
+			}
+			let large = parts.children.reverse().reduce((total, currentValue) => {
+				let scale = total.scale.x * params.proportion; // 大小差
+				currentValue.scale.set(scale, scale, scale);
+				return currentValue;
+			})
+			parts.position.y = (6 * large.scale.y) / 2;
+			// 创建树桩
+			var stump_geometry = new THREE.BoxBufferGeometry( 4, 6, 4 );
+			var stump_material = new THREE.MeshLambertMaterial( {color: 0xae3d43} );
+			stump = new THREE.Mesh( stump_geometry, stump_material );
+			stump.castShadow = true;
+			stump.receiveShadow = true;
+			stump.position.set(0, -10 / 2,0);
+			stump.rotateY(Math.PI/4);
+			tree.add(stump);
+			tree.add(parts);
+			tree.rotation.x = -Math.PI * 0.5;
+			let result = new THREE.Group();
+			result.add(tree);
+			return result;
+		}
+		
+		function create_flower (THREE) {
+			let spray; //花枝
+			let petal; //花瓣
+			let stamen; //花蕊
+			let flower = new THREE.Group();
+			let petals = new THREE.Group();
+			let Colors = [0xFFFF33,0xFF9999,0xFF33CC,0xFF0033,0xCCFFFF,0xCC3366,0xCC00FF,0x9966FF,0x6600FF]
+			var petal_geometry = new THREE.BoxGeometry( 2, 1.5, 0.2, 1, 1, 1 );
+			petal_geometry.translate(0, 2 /2 + 0.2, 0);
+			petal_geometry.vertices[3].z+=0.07;
+			petal_geometry.vertices[3].x-=0.5;
+			petal_geometry.vertices[2].z-=0.07;
+			petal_geometry.vertices[2].x-=0.5;
+			petal_geometry.vertices[6].z+=0.07;
+			petal_geometry.vertices[6].x+=0.5;
+			petal_geometry.vertices[7].z-=0.07;
+			petal_geometry.vertices[7].x+=0.5;
+			var petal_material = new THREE.MeshLambertMaterial( {color: Colors[Math.floor(Colors.length *Math.random())]} );
+			petal = new THREE.Mesh( petal_geometry, petal_material );
+			petal.castShadow = true;
+			petal.receiveShadow = true;
+			for(let i =0;i< 4;i++){
+				let petal_clone = petal.clone();
+				petal_clone.rotation.z = i * Math.PI / 2;
+				petals.add(petal_clone);
+			}
+
+			stamen = cube_creater(0.7,0.7,0.05,Colors[Math.floor(Colors.length *Math.random())]);
+			spray = cube_creater(0.2,3,0.2,0x599c59);
+			spray.position.y = - (3/2+1.5/2);
+			
+			petals.add(stamen);
+			petals.rotateX(-Math.PI/6);
+			flower.add(spray);
+			flower.add(petals);
+			flower.rotation.x = -Math.PI * 0.5;
+
+			let result = new THREE.Group();
+			result.add(flower);
+			return result;
+		}
+
+		function create_plane (THREE) {
+			let cockpit; //驾驶舱
+			let engine; //引擎
+			let wings; //机翼
+			let propellers; //螺旋桨
+			let bracket; //螺旋桨支架
+			let tail; //尾翼
+			let wheels; // 轮子
+			var Colors = {
+				red:0xf25346,
+				white:0xd8d0d1,
+				brown:0x59332e,
+				pink:0xF5986E,
+				brownDark:0x23190f,
+				blue:0x68c3c0,
+			};
+			// cube_creater(6,6,6,0xffffff);
+			engine_size = {
+				x: 2,
+				y: 6,
+				z: 6
+			}
+			engine = cube_creater(engine_size.x,engine_size.y,engine_size.z,Colors.white);
+			
+			bracket_size = {
+				x: 1.5,
+				y: .6,
+				z: .6
+			}
+			bracket = cube_creater(bracket_size.x,bracket_size.y,bracket_size.z,Colors.brown);
+			bracket.position.x = (engine_size.x + bracket_size.x) /2;
+			
+			propeller_size = {
+				x: 0.4,
+				y: 12,
+				z: 1
+			}
+			let propeller1 = cube_creater(propeller_size.x,propeller_size.y,propeller_size.z,Colors.brownDark);
+			let propeller2 = propeller1.clone();
+			propeller2.rotateX(Math.PI / 2);
+			propellers = new THREE.Group();
+			propellers.add(propeller1);
+			propellers.add(propeller2);
+			propellers.position.x = engine_size.x/2 + bracket_size.x - propeller_size.x / 2 - 0.2;
+			
+			
+			propellers.name = 'propellers';
+			// cockpit_size
+
+			var geomCockpit = new THREE.BoxGeometry(10,6,6,1,1,1);
+			var matCockpit = new THREE.MeshPhongMaterial({color:Colors.red, shading:THREE.FlatShading});
+			geomCockpit.vertices[4].y-=1;
+			geomCockpit.vertices[4].z+=2.5;
+			geomCockpit.vertices[5].y-=1;
+			geomCockpit.vertices[5].z-=2.5;
+			geomCockpit.vertices[6].y+=3.5;
+			geomCockpit.vertices[6].z+=2.5;
+			geomCockpit.vertices[7].y+=3.5;
+			geomCockpit.vertices[7].z-=2.5;
+
+			cockpit = new THREE.Mesh(geomCockpit, matCockpit);
+			cockpit.castShadow = true;
+			cockpit.receiveShadow = false;
+			cockpit.position.x = -10 /2;
+			
+			wing_size = {
+				x: 3,
+				y: 0.2,
+				z: 20
+			}
+
+			// wing
+			var geomWing = new THREE.BoxGeometry(wing_size.x,wing_size.y,wing_size.z,1,1,1);
+			var matWing = new THREE.MeshPhongMaterial({color:Colors.red, shading:THREE.FlatShading});
+			geomWing.vertices[4].y-=0.05;
+			geomWing.vertices[4].z+=1;
+			geomWing.vertices[5].y-=0.05;
+			geomWing.vertices[5].z-=1;
+			geomWing.vertices[6].y+=0.05;
+			geomWing.vertices[6].z+=1;
+			geomWing.vertices[7].y+=0.05;
+			geomWing.vertices[7].z-=1;
+
+			wing1 = new THREE.Mesh(geomWing, matWing);
+			wing1.castShadow = true;
+			wing1.receiveShadow = false;
+			wing2 = wing1.clone();
+			wing1.position.set(-3, 2, 0);
+			wing2.position.set(-3, 1, 0);
+			wings = new THREE.Group();
+			wings.add(wing1);
+			wings.add(wing2);
+			
+			wheels = new THREE.Group();
+			let wheel_container_size = {
+				x: 2,
+				y: 3,
+				z: 6
+			}
+			var geomwheel_container = new THREE.BoxGeometry(wheel_container_size.x,wheel_container_size.y,wheel_container_size.z,1,1,1);
+			var matwheel_container = new THREE.MeshPhongMaterial({color:Colors.red, shading:THREE.FlatShading});
+			geomwheel_container.vertices[4].z+=1;
+			geomwheel_container.vertices[5].z-=1;
+			geomwheel_container.vertices[6].z+=1;
+			geomwheel_container.vertices[7].z-=1;
+			var wheel_container = new THREE.Mesh(geomwheel_container, matwheel_container);
+			wheel_container.castShadow = true;
+			wheel_container.receiveShadow = false;
+			let wheel1 = cube_creater(0.2,wheel_container_size.x / 2,wheel_container_size.x / 2,Colors.brown);
+			wheel1.position.y = -wheel_container_size.x;
+			wheel1.rotateY(Math.PI / 2);
+			wheel1.position.z = 1.8;
+			let wheel2 = wheel1.clone();
+			wheel2.position.z = -1.8;
+
+			wheels.add(wheel_container);
+			wheels.add(wheel1);
+			wheels.add(wheel2);
+			
+			wheels.position.set(-wheel_container_size.x, -(engine_size.y / 2 - wheel_container_size.y / 2), 0);
+			
+
+			//tail
+			tail = cube_creater(1,1.5,0.2,Colors.red);
+			tail.position.set(-10.2, 2.6, 0);
+			
+			let tail_wheel = cube_creater(0.8,0.8,0.1,Colors.brown);
+			tail_wheel.position.set(-9.6,-0.5, 0);
+
+			let tail_bracket = cube_creater(0.3,1,0.2,Colors.red);
+			tail_bracket.position.set(-9.4,0, 0);
+			tail_bracket.rotateZ(-Math.PI / 6);
+
+
+			let plane = new THREE.Group();
+			plane.add(tail_bracket);
+			plane.add(tail_wheel);
+			plane.add(tail);
+			plane.add(wheels);
+			plane.add(wings);
+			plane.add(cockpit);
+			plane.add(bracket);
+			plane.add(propellers);
+			plane.add(engine);
+			
+			return plane;
+		}
+		
+		function create_cloud (THREE) {
+			let clouds = new THREE.Group();
+			
+			var cloud_geometry = new THREE.IcosahedronBufferGeometry(6);
+			var cloud_material = new THREE.MeshLambertMaterial( {color: 0xffffff} );
+			let cloud = new THREE.Mesh(cloud_geometry,cloud_material);
+			cloud.castShadow = false;
+			cloud.receiveShadow = false;
+			let cloudNum = Math.random() * 4;
+			for(let i = 0;i<cloudNum;i++) {
+				let cloud_clone = cloud.clone();
+				let scale = Math.random();
+				cloud_clone.scale.set(scale,scale,scale);
+				cloud_clone.position.x = Math.random() * 20 - 10;
+				cloud_clone.position.y = Math.random() * 12 - 6;
+				cloud_clone.position.z = Math.random() * 6 - 3;
+				clouds.add(cloud_clone);
+			}
+			return clouds;
+			// scene.add(clouds);
+		}
+
+		function create_forest (THREE) {
+			let Colors = {
+				red:0xf25346,
+				yellow:0xedeb27,
+				white:0xd8d0d1,
+				brown:0x59332e,
+				pink:0xF5986E,
+				brownDark:0x23190f,
+				blue:0x68c3c0,
+				green:0x458248,
+				purple:0x551A8B,
+				lightgreen:0x629265,
+			};
+			var geometry = new THREE.CylinderBufferGeometry( 40 - 2, 40 - 2, 80, 32 );
+			var material = new THREE.MeshLambertMaterial( {color: Colors.lightgreen} );
+
+			var land = new THREE.Mesh( geometry, material );
+			// land.castShadow = true;
+			land.receiveShadow = true;
+			land.rotation.x = Math.PI / 2;
+			var sphere = new THREE.Group();
+			sphere.add(land);
+			let tree=[];
+			let trees=new THREE.Group();
+			let flowers=[];
+			let flowerss=new THREE.Group();
+			let clouds=[];
+			let cloudss=new THREE.Group();
+			
+			for (var i = 0; i < 200; i++){
+				tree[i]=create_tree(THREE);
+				let size = 0.06 + Math.random() * 3;
+				size *= 0.1;
+				tree[i].scale.set(size,size,size);
+				let rx=Math.random() * Math.PI * 2;
+				tree[i].position.setFromCylindricalCoords(40, rx, 60 * i/200 - 30);
+				tree[i].lookAt(new THREE.Vector3(0,60 * i/200 - 30,0));
+				trees.add(tree[i]);
+			}
+			trees.rotateX(Math.PI / 2);
+			trees.position.z = -10;
+			sphere.add(trees);
+			for (var i = 0; i < 200; i++){
+				flowers[i]=create_flower(THREE);
+				let size = 1 - 1 / 2 + Math.random() * 1;
+				size *= 0.2;
+				flowers[i].scale.set(size,size,size);
+				let rx=Math.random() * Math.PI * 2;
+				let ry=Math.random() * Math.PI;
+				flowers[i].position.setFromCylindricalCoords(40, rx, 80 * i/200 - 40);
+				flowers[i].lookAt(new THREE.Vector3(0,80 * i/200 - 40,0));
+			flowerss.add(flowers[i]);
+			}
+			flowerss.rotateX(Math.PI / 2);
+			
+			sphere.add(flowerss);
+			for (var i = 0; i < 50; i++){
+				clouds[i]=create_cloud(THREE);
+				let size = 1 - 1 / 2 + Math.random() * 1;
+				size *= 0.4;
+				clouds[i].scale.set(size,size,size);
+				let rx=Math.random() * Math.PI * 2;
+				let ry=Math.random() * Math.PI;
+				clouds[i].position.setFromCylindricalCoords(60, rx, 20 * i/50 - 10);
+				clouds[i].lookAt(new THREE.Vector3(0,20 * i/50 - 10,0));
+				cloudss.add(clouds[i]);
+			}
+			cloudss.rotateX(Math.PI / 2);
+			cloudss.position.z = - 20;
+			sphere.add(cloudss);
+			
+			// sphere.position.set(0,-46,50);
+			// return sphere;
+			// scene.add( sphere );
+			return sphere;
+		}
+		
+		function create_sun (THREE) {
+			var geometry = new THREE.CircleBufferGeometry( 30, 32 );
+			var material = new THREE.MeshBasicMaterial( { color: 0xedeb27,side: THREE.DoubleSide } );
+			var circle = new THREE.Mesh( geometry, material );
+			circle.position.y = -10;
+			circle.position.z = -20;
+			// circle.rotation.x = Math.PI/2;
+			// scene.add( circle );
+			return circle;
+		}
+		
+		function scene_effect (THREE) {
+			scene.fog = new THREE.Fog(0xf7d9aa,10,120);
+		}
+
+		
+		function createLights(){
+			// Gradient coloured light - Sky, Ground, Intensity
+			hemisphereLight = new THREE.HemisphereLight(0xaaaaaa,0x000000, .9)
+			// // Parallel rays
+			// shadowLight = new THREE.DirectionalLight(0xffffff, 1,100);
+			scene.add(hemisphereLight);
+			// // dirLight = new THREE.DirectionalLight( 0xffffff, 1 );
+			// 	shadowLight.name = 'Dir. Light';
+			// 	shadowLight.position.set( 0, 100, 0 );
+			// 	shadowLight.castShadow = true;
+			// 	shadowLight.shadow.camera.near = 0.5;
+			// 	shadowLight.shadow.camera.far = 100;
+			// 	shadowLight.shadow.camera.right = 150;
+			// 	shadowLight.shadow.camera.left = - 150;
+			// 	shadowLight.shadow.camera.top	= 150;
+			// 	shadowLight.shadow.camera.bottom = - 150;
+			// 	shadowLight.shadow.mapSize.width = 1024;
+			// 	shadowLight.shadow.mapSize.height = 1024;
+var light = new THREE.DirectionalLight( 0xffffff, 1, 100 );
+light.position.set( 0, 10, 50 );			//default; light shining from top
+let target = new THREE.Object3D();
+target.position.set(0,-40,0);
+light.target = target;
+scene.add( light.target );
+light.castShadow = true;            // default false
+scene.add( light );
+
+light.shadow.mapSize.width = 2048;  // default
+light.shadow.mapSize.height = 2048; // default
+light.shadow.camera.near = 0.5;    // default
+light.shadow.camera.far = 60;     // default
+light.shadow.camera.right = 80;
+light.shadow.camera.left = - 80;
+light.shadow.camera.top	= 80;
+light.shadow.camera.bottom = - 80;
+// var helper = new THREE.CameraHelper( light.shadow.camera );
+// scene.add( helper );
+		}
+		function cube_creater (x, y, z, color) {
+			var geometry = new THREE.BoxBufferGeometry( x, y, z, 1, 1, 1 );
+			var material = new THREE.MeshLambertMaterial( {color: color} );
+			let mesh = new THREE.Mesh( geometry, material );
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
+			return mesh;
+		}
+
+		
+		window.addEventListener('mousemove',(e) => {
+			setM(e);
+		});
+		function setM(e) {
+			mouse.x = (e.clientX) / renderer.domElement.clientWidth * 2 - 1;
+			mouse.y = ((e.clientY) / renderer.domElement.clientHeight * 2) - 1;
+		}
+		
+function normalize(v,vmin,vmax,tmin, tmax){
+
+var nv = Math.max(Math.min(v,vmax), vmin);
+var dv = vmax-vmin;
+var pc = (nv-vmin)/dv;
+var dt = tmax-tmin;
+var tv = tmin + (pc*dt);
+return tv;
+
+}
+// (-2,4,40);
+function updatePlane() {
+
+var targetY = normalize(mouse.y,-.75,.75, 8, 0);
+var targetX = normalize(mouse.x,-.75,.75,-10, 2);
+
+// Move the plane at each frame by adding a fraction of the remaining distance
+plane.position.y += (targetY-plane.position.y)*0.1;
+
+plane.position.x += (targetX-plane.position.x)*0.1;
+
+// Rotate the plane proportionally to the remaining distance
+plane.rotation.z = (targetY-plane.position.y)*0.0128 * 10;
+plane.rotation.x = (plane.position.y-targetY)*0.0064* 10;
+plane.rotation.y = (plane.position.x-targetX)*0.0064* 10;
+// plane.propeller.rotation.x += 0.3;
+}
+// 		function updatePlane() {
+// 		var targetY = mouse.y;
+// 		var targetX = mouse.x;
+
+// 		// Move the plane at each frame by adding a fraction of the remaining distance
+// 		// (-2,4,40);
+// 		if (plane.position.y + targetY > 4 + edge.top) {
+// 			return;
+// 		}
+// 		else if (plane.position.y+ targetY < 4 + edge.bottom) {
+// 			return;
+// 		}
+// 		else if (plane.position.x+ targetX > -2 + edge.right) {
+// 			return;
+// 		}
+// 		else if (plane.position.x+ targetX < -2 + edge.left) {
+// 			return;
+// 		}else {
+// 		plane.position.y += targetY;
+
+// 		plane.position.x += targetX;
+// 		}
+
+
+// 		// Rotate the plane proportionally to the remaining distance
+// 		// plane.mesh.rotation.z = (targetY-plane.mesh.position.y)*0.0128;
+// 		// plane.mesh.rotation.x = (plane.mesh.position.y-targetY)*0.0064;
+// 		// plane.mesh.rotation.y = (plane.mesh.position.x-targetX)*0.0064;
+
+// 		// plane.propeller.rotation.x += 0.3;
+// 		}
+
+		function positionTurner (object, position) {
+			let box = new THREE.Box3();
+			box.setFromObject(object);
+			object.position.set(
+				position.x,
+				position.y !== undefined ? position.y : box.max.y / 2,
+				position.z
+			);
+			let center = new THREE.Vector3();
+			object.position.sub(box.getCenter(center));
+			return object;
+		}
+    </script>
+
+</body>
+
+</html>
