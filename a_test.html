@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>Document</title>
+	<style>
+		body{
+			background: red;
+		}
+	</style>
+</head>
+
+<body>
+	<script>
+		get_canvas(100, 'red', 'blue');
+		function get_canvas(size, startColor, endColor) {
+			let canvas = document.createElement('canvas');
+			canvas.width = size;
+			canvas.height = size;
+			canvas.style.backgroundColor = 'transparent';
+			let context = canvas.getContext('2d');
+			// context.fillStyle = 'transparent';
+			context.fillStyle = 'rgba(255, 255, 255, 0)';
+			context.fillRect(0,0,100,100);
+			let gradient = context.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.width / 8, canvas.width / 2,
+				canvas.height / 2, canvas.width / 2);
+			gradient.addColorStop(0, startColor);
+			gradient.addColorStop(1, endColor);
+			
+			context.fillStyle = gradient;
+			context.beginPath();
+			context.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, Math.PI * 2, true);
+			context.fill();
+			document.body.appendChild(canvas);
+			// let texture = new THREE.Texture(canvas);
+			// texture.needsUpdate = true;
+			// return texture;
+		}
+	</script>
+</body>
+
+</html>
