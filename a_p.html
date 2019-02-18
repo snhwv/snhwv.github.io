@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- 物体发光效果 -->
+
+<head>
+	<title>Simple Glow (Three.js)</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+	<style>
+		* {
+				margin: 0;
+				padding: 0;
+			}
+			canvas {
+				/* background: linear-gradient(#e4e0ba, #f7d9aa); */
+				background: black;
+			}
+		</style>
+</head>
+
+<body>
+	<!-- <script type="text/javascript" src="../build/three.min.js"></script> -->
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/three.min.js"></script>
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/controls/OrbitControls.js"></script>
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/loaders/GLTFLoader.js"></script>
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/libs/tween.min.js"></script>
+	<script type="text/javascript" src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/utils/BufferGeometryUtils.js"></script>
+	<!-- <script src="js/controls/OrbitControls.js"></script>
+	<script src="js/loaders/GLTFLoader.js"></script>
+	<script src="js/libs/tween.min.js"></script>
+	<script src="js/BufferGeometryUtils.js"></script> -->
+	<script type="x-shader/x-vertex" id="vertexshader">
+
+		attribute vec3 position2;
+		uniform float val;
+		void main() {
+				gl_PointSize = 1. * val + 4. * (1.-val);
+				vec3 vPos;
+				vPos.x = (position.x * val + position2.x*(1.-val)) * 60.;
+				vPos.y = (position.y * val + position2.y*(1.-val))* 60.;
+				vPos.z = (position.z * val + position2.z*(1.-val))* 60.;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4(vPos, 1.0);
+			}
+		</script>
+	<!-- 片元着色器代码 -->
+	<script type="x-shader/x-fragment" id="fragmentshader">
+		uniform vec3 color;
+			void main() {
+				gl_FragColor = vec4(color, 1.0);
+			}
+		</script>
+	<script>
+		var scene = new THREE.Scene();
+		var camera = new THREE.PerspectiveCamera(
+			45,
+			window.innerWidth / window.innerHeight,
+			1,
+			10000
+		);
+		camera.position.set(0, 100, -100);
+		var renderer = new THREE.WebGLRenderer({
+			antialias: true,
+			alpha: true
+		});
+		createLights();
+		renderer.shadowMapEnabled = true;
+		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		document.body.appendChild(renderer.domElement);
+
+		var controls = new THREE.OrbitControls(camera, renderer.domElement);
+		var clock = new THREE.Clock();
+		var gridHelper = new THREE.GridHelper(400, 40, 0x808080, 0x808080);
+		gridHelper.position.y = 0;
+		gridHelper.position.x = 0;
+		scene.add(gridHelper);
+
+		// 创建球体模型
+		loadGLTF();
+		let particleSystem;
+
+		function loadGLTF(path) {
+			let loader = new THREE.GLTFLoader();
+			loader.load(`objs/garens-sword-lol.gltf`, (gltf) => {
+				let object = gltf.scene;
+				let objGeometry = toBufferGeometry(object);
+				objGeometry.rotateZ(-Math.PI / 2);
+				let vArr = setVs(objGeometry.attributes.position.array);
+				objGeometry.addAttribute('position2', new THREE.BufferAttribute(vArr, 3));
+				particleSystem = create_particleSystem(objGeometry, {
+					color: {
+						type: 'v3',
+						value: new THREE.Color(0xffffff)
+					},
+					val: {
+						value: 1
+					}
+				});
+				// new TWEEN.Tween({val: 1}).to({val: 0},2000).easing( TWEEN.Easing.Exponential.InOut )
+				// .start().onUpdate(function (){
+				// 	a.call(this,particleSystem);
+				// }).onComplete(() => {
+				// 	new TWEEN.Tween({val: 0}).to({val: 1},2000).easing( TWEEN.Easing.Exponential.InOut )
+				// 	.start().onUpdate(function (){
+				// 		a.call(this,particleSystem);
+				// 	});
+				// });
+				scene.add(particleSystem);
+			}, null, () => {
+				console.log('load obj failed');
+			});
+		}
+
+		function a(particleSystem, val) {
+			particleSystem && tweenUpdate(particleSystem, val);
+		}
+
+		function tweenUpdate(particleSystem, val) {
+			particleSystem.material.uniforms.val.value = val;
+		}
+
+		function setVs(arr) {
+			let normalArray = [];
+			for (let i = 0; i < arr.length; i++) {
+				normalArray.push(THREE.Math.randFloatSpread(20));
+			}
+			return new Float32Array(normalArray);
+		}
+
+		function create_particleSystem(geometry, uniforms) {
+			let shaderMaterial = new THREE.ShaderMaterial({
+				uniforms: uniforms,
+				vertexShader: document.getElementById('vertexshader').textContent,
+				fragmentShader: document.getElementById('fragmentshader').textContent,
+				blending: THREE.AdditiveBlending,
+				depthTest: false,
+				transparent: true
+			});
+			let particleSystem = new THREE.Points(geometry, shaderMaterial);
+			return particleSystem;
+		}
+		let angle = 0;
+		animation();
+		window.addEventListener('resize', onWindowResize, false);
+
+		function rotate(v, deg, obj) {
+			var axis = v; //创建一个三维向量
+			var rotWorldMatrix = new THREE.Matrix4(); //创建一个4*4矩阵
+			rotWorldMatrix.makeRotationAxis(axis.normalize(), deg);
+			rotWorldMatrix.multiply(obj.matrix); // pre-multiply
+			obj.matrix = rotWorldMatrix;
+			obj.rotation.setFromRotationMatrix(obj.matrix);
+		}
+
+		function toBufferGeometry(object) {
+
+			let children = object.children;
+			const geometries = [];
+			for (let i = 0; i < children.length; i++) {
+				const geometry = children[i].geometry.clone();
+				geometries.push(geometry);
+			}
+			const boxes = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
+			return boxes;
+		}
+
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+
+		function animation() {
+			requestAnimationFrame(animation);
+			var delta = clock.getDelta();
+			angle += delta;
+			a(particleSystem, Math.sin(angle));
+			// TWEEN.update();
+			render();
+		}
+
+		function render() {
+			renderer.render(scene, camera);
+		}
+
+		function createLights() {
+			hemisphereLight = new THREE.HemisphereLight(
+				0xaaaaaa,
+				0x000000,
+				0.9
+			);
+			scene.add(hemisphereLight);
+			var light = new THREE.DirectionalLight(0xffffff, 1, 100);
+			light.position.set(0, 10, 50); //default; light shining from top
+			let target = new THREE.Object3D();
+			target.position.set(0, -40, 0);
+			light.target = target;
+			scene.add(light.target);
+			light.castShadow = true; // default false
+			scene.add(light);
+			var AmbientLight = new THREE.AmbientLight(0xffffff); // soft white AmbientLight
+			scene.add(AmbientLight);
+		}
+	</script>
+</body>
+
+</html>
