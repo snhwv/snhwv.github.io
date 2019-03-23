@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>the cube</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script
+      type="text/javascript"
+      src="https://threejsfundamentals.org/threejs/resources/threejs/r98/three.min.js"
+    ></script>
+    <script src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/controls/OrbitControls.js"></script>
+    <script src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/utils/SceneUtils.js"></script>
+    <script src="https://threejsfundamentals.org/threejs/resources/threejs/r98/js/libs/stats.min.js"></script>
+    <script>
+      var renderer, stats, scene, camera;
+      var cubes = [];
+      var cubedefault = {
+        size: 10
+      };
+      var group;
+      var rotateGroupData;
+      var rotateData = {
+        top: {
+          derection: 1,
+          axis: "y",
+          val: cubedefault.size
+        },
+        bottom: {
+          derection: 1,
+          axis: "y",
+          val: -cubedefault.size
+        },
+        middleY: {
+          derection: 1,
+          axis: "y",
+          val: 0
+        },
+        front: {
+          derection: 1,
+          axis: "z",
+          val: cubedefault.size
+        },
+        backend: {
+          derection: 1,
+          axis: "z",
+          val: -cubedefault.size
+        },
+        middleZ: {
+          derection: 1,
+          axis: "z",
+          val: 0
+        },
+        left: {
+          derection: 1,
+          axis: "x",
+          val: -cubedefault.size
+        },
+        right: {
+          derection: 1,
+          axis: "x",
+          val: cubedefault.size
+        },
+        middleX: {
+          derection: 1,
+          axis: "x",
+          val: 0
+        }
+      };
+      var animationGroupIndex = 0;
+      var animationGroup = [];
+      var controls;
+      var rotatePlane;
+      init();
+      animate();
+
+      //
+
+      function init() {
+        var container = document.getElementById("container");
+
+        //
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xb0b0b0);
+
+        //
+
+        camera = new THREE.PerspectiveCamera(
+          50,
+          window.innerWidth / window.innerHeight,
+          1,
+          1000
+        );
+        camera.position.set(0, 0, 200);
+
+        //
+
+        var directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        directionalLight.position.set(0.75, 0.75, 1.0).normalize();
+        scene.add(directionalLight);
+
+        var ambientLight = new THREE.AmbientLight(0xcccccc, 0.2);
+        scene.add(ambientLight);
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: true
+        });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        // 这个平面是第一次点击的方块面所在的平面
+        rotatePlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+        var axesHelper = new THREE.AxesHelper(80);
+        scene.add(axesHelper);
+
+        // 生成方块 9 * 3
+        genrateMagicCube();
+        // 要执行旋转的group
+        group = new THREE.Object3D();
+
+        scene.add(group);
+        // 从负轴的方向 看下去的旋转方式,animationGroup是旋转数组，存放旋转操作
+        animationGroup.push({ position: "top", derection: 1 });
+        // renderer.domElement.addEventListener(
+        //   "mousemove",
+        //   mouseMoveHandler,
+        //   false
+        // );
+        renderer.domElement.addEventListener("mouseup", mouseUpHandler, false);
+        renderer.domElement.addEventListener(
+          "mousedown",
+          mouseDownHandler,
+          false
+        );
+        stats = new Stats();
+        document.body.appendChild(stats.dom);
+
+        window.addEventListener("resize", onWindowResize, false);
+      }
+      var raycaster = new THREE.Raycaster();
+      var mouse = new THREE.Vector2();
+      var isMoveCube = false;
+      var startMouse = new THREE.Vector3();
+      var doneMouse = new THREE.Vector3();
+      var faceNormal;
+      var intersectCubePosition;
+      // function mouseMoveHandler(event) {}
+      function mouseUpHandler() {
+        // 如果鼠标第一次点的是方块，则执行
+        if (isMoveCube) {
+          event.preventDefault();
+          mouse.set(
+            (event.clientX / window.innerWidth) * 2 - 1,
+            -(event.clientY / window.innerHeight) * 2 + 1
+          );
+          raycaster.setFromCamera(mouse, camera);
+
+          var intersects = raycaster.intersectObjects(cubes);
+          // ray与第一次点击的生成的面的交点
+          raycaster.ray.intersectPlane(rotatePlane, doneMouse);
+
+          // 删除不相关面
+          var keys = Object.keys(faceNormal);
+          for (let i = 0; i < keys.length; i++) {
+            if (Math.abs(faceNormal[keys[i]]) === 1) {
+              Reflect.deleteProperty(startMouse, keys[i]);
+              Reflect.deleteProperty(doneMouse, keys[i]);
+            }
+          }
+          // 通过这个向量选择旋转组，有两个分量，选择大的分量为旋转组
+          let chooseDerectionPoint = startMouse.sub(doneMouse);
+          let Vkeys = Object.keys(chooseDerectionPoint);
+          if (
+            Math.abs(chooseDerectionPoint[Vkeys[0]]) >
+            Math.abs(chooseDerectionPoint[Vkeys[1]])
+          ) {
+            findGroup(Vkeys[1], Vkeys[0], chooseDerectionPoint[Vkeys[0]]);
+          } else {
+            findGroup(Vkeys[0], Vkeys[1], chooseDerectionPoint[Vkeys[1]]);
+          }
+        }
+        isMoveCube = false;
+        controls.enabled = true;
+      }
+      // 通过分量获取旋转组并旋转
+      function findGroup(rotateAxis, axis, axisVal) {
+        let dataKey = Object.keys(rotateData);
+        for (let i = 0; i < dataKey.length; i++) {
+          if (
+            rotateData[dataKey[i]].axis === rotateAxis &&
+            rotateData[dataKey[i]].val === intersectCubePosition[rotateAxis]
+          ) {
+            animationGroup.push({
+              position: dataKey[i],
+              derection: axisVal > 0 ? 1 : -1
+            });
+          }
+        }
+      }
+      function mouseDownHandler(event) {
+        event.preventDefault();
+        mouse.set(
+          (event.clientX / window.innerWidth) * 2 - 1,
+          -(event.clientY / window.innerHeight) * 2 + 1
+        );
+
+        raycaster.setFromCamera(mouse, camera);
+
+        var intersects = raycaster.intersectObjects(cubes);
+
+        if (intersects.length > 0) {
+          isMoveCube = true;
+          controls.enabled = false;
+          let intersectObj = intersects[0];
+          startMouse.copy(intersectObj.point);
+          faceNormal = intersectObj.face.normal.clone();
+          // 将局部向量转化为世界向量并减去方块的位置，即得到世界坐标中的法向量
+          var c = intersectObj.object.localToWorld(faceNormal);
+          intersectCubePosition = intersectObj.object.position;
+          faceNormal = intersectCubePosition.clone().sub(c);
+          // 设置旋转辅助面
+          rotatePlane.set(faceNormal.clone(), 15);
+        }
+      }
+
+      // 找到方块并加入旋转组
+      function rotate({ position = "top", derection = 1 }) {
+        var rotate = rotateData[position];
+        rotate.derection = derection;
+        rotateGroupData = rotate;
+        group.add(
+          ...cubes.filter(item => {
+            return item.position[rotate.axis] === rotate.val;
+          })
+        );
+      }
+
+      function genrateMagicCube() {
+        var size = cubedefault.size;
+        var geometry = new THREE.BoxBufferGeometry(size, size, size);
+        var materials = [
+          new THREE.MeshBasicMaterial({
+            color: 0xf44336
+          }),
+          new THREE.MeshBasicMaterial({
+            color: 0xe91e63
+          }),
+          new THREE.MeshBasicMaterial({
+            color: 0xffeb3b
+          }),
+          new THREE.MeshBasicMaterial({
+            color: 0x00bcd4
+          }),
+          new THREE.MeshBasicMaterial({
+            color: 0x3f51b5
+          }),
+          new THREE.MeshBasicMaterial({
+            color: 0x607d8b
+          })
+        ];
+        var cube;
+        var postions = genratePosition();
+        for (var i = 0; i < postions.length; i++) {
+          cube = new THREE.Mesh(
+            geometry,
+            new THREE.MeshFaceMaterial(materials)
+          );
+          cubes.push(cube);
+          cube.position.copy(postions[i]);
+          // scene.add(line);
+          scene.add(cube);
+        }
+      }
+
+      function genratePosition() {
+        var cubePositions = [];
+        var size = cubedefault.size;
+        for (var x = -1; x < 2; x++) {
+          // x = x + 0.1;
+          for (var y = -1; y < 2; y++) {
+            // y = y + 0.1;
+            for (var z = -1; z < 2; z++) {
+              // z = z + 0.1;
+              var v3 = new THREE.Vector3(x * size, y * size, z * size);
+              cubePositions.push(v3);
+            }
+          }
+        }
+        return cubePositions;
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      // 由于旋转后的位置，角度不正，所以需要round
+      function round(num, baseNum) {
+        var sign = num >= 0 ? 1 : -1;
+        num = Math.abs(num);
+        var times = Math.floor(num / baseNum);
+        var remainder = num % baseNum;
+        var result = times * baseNum;
+        Math.abs(remainder) > baseNum / 2 && (result += baseNum);
+        return result * sign;
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        render();
+        stats.update();
+      }
+      function render() {
+        //如果旋转组存在
+        if (group.children.length) {
+          // 按方向旋转
+          if (
+            group.rotation[rotateGroupData.axis] * rotateGroupData.derection <
+            Math.PI / 2
+          ) {
+            group.rotation[rotateGroupData.axis] +=
+              0.4 * rotateGroupData.derection;
+          } else {
+            // 将group旋转组中的子元素放入scene中
+            for (let i = 0; i < 9; i++) {
+              var child = group.children[0];
+              THREE.SceneUtils.detach(child, group, scene);
+              child.position.copy(
+                new THREE.Vector3(
+                  round(child.position.x, cubedefault.size),
+                  round(child.position.y, cubedefault.size),
+                  round(child.position.z, cubedefault.size)
+                )
+              );
+              // 重置
+              child.rotation.x = round(child.rotation.x, Math.PI / 2);
+              child.rotation.y = round(child.rotation.y, Math.PI / 2);
+              child.rotation.z = round(child.rotation.z, Math.PI / 2);
+            }
+            // 重置
+            group.rotation.x = 0;
+            group.rotation.y = 0;
+            group.rotation.z = 0;
+          }
+        } else if (
+          // 如果有要旋转的操作
+          animationGroup.length &&
+          animationGroupIndex < animationGroup.length
+        ) {
+          // 找到旋转组并插入子元素
+          rotate(animationGroup[animationGroupIndex]);
+          animationGroupIndex++;
+        }
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>
