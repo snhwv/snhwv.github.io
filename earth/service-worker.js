@@ -14,7 +14,7 @@
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/4.3.1/workbox-sw.js");
 
 importScripts(
-  "precache-manifest.6602d8f01cf69e878efbc5c5f31b26bc.js"
+  "precache-manifest.8805c0766294f9351a5d83b214bcea27.js"
 );
 
 workbox.core.setCacheNameDetails({prefix: "cockpit"});
