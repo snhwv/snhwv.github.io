@@ -1,6 +1,6 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "716dde81b081f8377241",
+    "revision": "0347e7732b16fd851f23",
     "url": "css/app.6d839f81.css"
   },
   {
@@ -68,7 +68,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "imgs/微信图片_20200903100401.png"
   },
   {
-    "revision": "8e2474308c375f2e1617eb482866f258",
+    "revision": "7057f3606f0b7e928fd980a6544c2690",
     "url": "index.html"
   },
   {
@@ -76,8 +76,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "js/about.55d0f876.js"
   },
   {
-    "revision": "716dde81b081f8377241",
-    "url": "js/app.5d3a4b8b.js"
+    "revision": "0347e7732b16fd851f23",
+    "url": "js/app.31232465.js"
   },
   {
     "revision": "976cc514facc604cc5e3",
